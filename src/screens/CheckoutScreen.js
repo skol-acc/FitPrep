@@ -1,17 +1,41 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Alert, ActivityIndicator } from 'react-native';
 import HeaderBar from '../components/HeaderBar';
 import { COLORS } from '../theme';
+import { placeOrder } from '../services/ordersService';
+import { supabase } from '../lib/supabaseClient';
 
 const timeOptions = [
   { label: '6:00 AM', subtitle: 'Early Morning' },
   { label: '10:00 AM', subtitle: 'Standard Window' },
 ];
 
-export default function CheckoutScreen({ planName, onBack, onConfirm }) {
+export default function CheckoutScreen({ plan, user, onBack, onConfirm }) {
   const [selectedTime, setSelectedTime] = useState('6:00 AM');
-  const [paymentType, setPaymentType] = useState('cash');
+  const [paymentType, setPaymentType] = useState('online');
+  const [loading, setLoading] = useState(false);
   const [proofAttached, setProofAttached] = useState(false);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id;
+      if (!userId || !plan?.id) {
+        Alert.alert('Error', 'Could not place order. Please try again.');
+        return;
+      }
+      const { error } = await placeOrder(userId, plan.id);
+      if (error) {
+        Alert.alert('Order Failed', error.message);
+        return;
+      }
+      console.log('✅ [Orders] Order placed successfully for plan:', plan.name);
+      onConfirm();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -22,7 +46,7 @@ export default function CheckoutScreen({ planName, onBack, onConfirm }) {
           <View style={styles.planBadge}><Text style={styles.planBadgeText}>Plan Selected</Text></View>
           <Text style={styles.summaryMeals}>14 Total Meals</Text>
         </View>
-        <Text style={styles.summaryTitle}>{planName}</Text>
+        <Text style={styles.summaryTitle}>{plan?.name || 'Selected Plan'}</Text>
         <View style={styles.recipeRow}>
           <View style={styles.recipeImage} />
           <View style={styles.recipeItems}>
@@ -87,15 +111,17 @@ export default function CheckoutScreen({ planName, onBack, onConfirm }) {
       </View>
 
       <View style={styles.totalCard}>
-        <View style={styles.totalRow}><Text style={styles.totalLabel}>Subtotal</Text><Text style={styles.totalValue}>$168.00</Text></View>
+        <View style={styles.totalRow}><Text style={styles.totalLabel}>Subtotal</Text><Text style={styles.totalValue}>${plan?.weekly_price?.toFixed(2) || '—'}</Text></View>
         <View style={styles.totalRow}><Text style={styles.totalLabel}>Delivery Fee</Text><Text style={[styles.totalValue, styles.freeLabel]}>FREE</Text></View>
-        <View style={styles.totalRow}><Text style={styles.totalLabel}>Tax</Text><Text style={styles.totalValue}>$12.40</Text></View>
         <View style={styles.divider} />
-        <View style={styles.totalRow}><Text style={styles.totalTitle}>Total</Text><Text style={styles.totalTitle}>$180.40</Text></View>
+        <View style={styles.totalRow}><Text style={styles.totalTitle}>Total</Text><Text style={styles.totalTitle}>${plan?.weekly_price?.toFixed(2) || '—'}</Text></View>
       </View>
 
-      <Pressable style={styles.confirmButton} onPress={onConfirm}>
-        <Text style={styles.confirmLabel}>Confirm Order →</Text>
+      <Pressable style={[styles.confirmButton, loading && { opacity: 0.6 }]} onPress={handleConfirm} disabled={loading}>
+        {loading
+          ? <ActivityIndicator color="#ffffff" />
+          : <Text style={styles.confirmLabel}>Confirm & Pay →</Text>
+        }
       </Pressable>
     </ScrollView>
   );

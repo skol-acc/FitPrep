@@ -1,73 +1,53 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
 import HeaderBar from '../components/HeaderBar';
 import { COLORS } from '../theme';
 import { usePlans } from '../context/PlansContext';
 
-const previewPlans = [
-  { title: 'Cutting', subtitle: 'Designed for fat loss while preserving muscle.', price: '$99/week', calories: '1,800 - 2,200 kcal', selected: true },
-  { title: 'Bulking', subtitle: 'Muscle growth with strong nutrition support.', price: '$119/week', calories: '2,800 - 3,200 kcal' },
-  { title: 'Maintenance', subtitle: 'Balanced energy for long-term health.', price: '$109/week', calories: '2,300 - 2,500 kcal' },
-];
-
-export default function HomeScreen({ user, onOpenWeeklyPlan, onOpenCheckout, onSwitchToAdmin }) {
-  const { plans, loading, error, source } = usePlans();
-  const planCount = Array.isArray(plans) ? plans.length : 0;
-  const statusLabel = loading ? 'Loading plans...' : `Plans loaded: ${planCount} (${source})`;
+export default function HomeScreen({ user, onOpenWeeklyPlan, onOpenCheckout, onBack }) {
+  const { plans, loading, error } = usePlans();
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <HeaderBar
         title="Fuel your performance."
         action={{ icon: '🔔', onPress: () => {} }}
+        onBack={onBack}
       />
 
-      <View style={styles.dataStatusCard}>
-        <Text style={styles.dataStatusText}>{statusLabel}</Text>
-        {error ? <Text style={styles.dataStatusError}>{error}</Text> : null}
-      </View>
-
-      <Text style={styles.greeting}>Hello, {user.name}</Text>
+      <Text style={styles.greeting}>Hello, {user?.name || 'there'} 👋</Text>
       <Text style={styles.description}>Precision nutrition tailored for your fitness goals. Freshly prepared, chef-curated.</Text>
 
-      {user.role === 'admin' && (
-        <Pressable style={styles.adminPreviewButton} onPress={onSwitchToAdmin}>
-          <Text style={styles.adminPreviewText}>Return to Admin Panel</Text>
-        </Pressable>
-      )}
+      {loading && <ActivityIndicator color={COLORS.accent} style={{ marginVertical: 20 }} />}
+      {!!error && <Text style={styles.dataStatusError}>{error}</Text>}
 
-      {previewPlans.map((plan) => (
-        <View key={plan.title} style={[styles.planCard, plan.selected && styles.planCardActive]}>
+      {!loading && plans.map((plan) => (
+        <View key={plan.id} style={styles.planCard}>
           <View style={styles.planMedia}>
             <View style={styles.planMediaPlaceholder} />
-            {plan.selected && <View style={styles.selectedBadge}><Text style={styles.selectedBadgeText}>SELECTED</Text></View>}
           </View>
           <View style={styles.planBody}>
-            <Text style={styles.planTitle}>{plan.title}</Text>
-            <Text style={styles.planMeta}>{plan.calories}</Text>
-            <Text style={styles.planSubtitle}>{plan.subtitle}</Text>
+            <Text style={styles.planTitle}>{plan.name}</Text>
+            <Text style={styles.planMeta}>{plan.category}</Text>
+            <Text style={styles.planSubtitle}>{plan.description}</Text>
           </View>
           <View style={styles.planFooter}>
-            <Text style={styles.planPrice}>{plan.price}</Text>
-            <Pressable style={[styles.planAction, plan.selected && styles.planActionPrimary]} onPress={() => onOpenCheckout(plan.title)}>
-              <Text style={[styles.planActionText, plan.selected && styles.planActionTextPrimary]}>{plan.selected ? 'Update Plan' : 'Choose Plan'}</Text>
+            <Text style={styles.planPrice}>${plan.weekly_price}/wk</Text>
+            <Pressable style={styles.planAction} onPress={() => onOpenCheckout(plan)}>
+              <Text style={styles.planActionText}>Preorder</Text>
             </Pressable>
           </View>
         </View>
       ))}
 
-      <View style={styles.statsCard}>
-        <Text style={styles.statsHeading}>Daily Macro Targets</Text>
-        <View style={styles.macroRow}><Text style={styles.macroLabel}>Protein</Text><Text style={styles.macroValue}>160g / 200g</Text></View>
-        <View style={styles.macroTrack}><View style={[styles.macroFill, { width: '80%' }]} /></View>
-        <View style={styles.macroRow}><Text style={styles.macroLabel}>Carbohydrates</Text><Text style={styles.macroValue}>120g / 150g</Text></View>
-        <View style={styles.macroTrack}><View style={[styles.macroFill, { width: '75%' }]} /></View>
-        <View style={styles.macroRow}><Text style={styles.macroLabel}>Fats</Text><Text style={styles.macroValue}>45g / 65g</Text></View>
-        <View style={styles.macroTrack}><View style={[styles.macroFill, { width: '69%' }]} /></View>
-      </View>
+      {!loading && plans.length === 0 && !error && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No active plans this week yet. Check back soon!</Text>
+        </View>
+      )}
 
       <Pressable style={styles.ctaButton} onPress={onOpenWeeklyPlan}>
-        <Text style={styles.ctaLabel}>View Weekly Plan</Text>
+        <Text style={styles.ctaLabel}>View This Week's Meals</Text>
         <Text style={styles.ctaArrow}>→</Text>
       </Pressable>
     </ScrollView>
@@ -197,16 +177,17 @@ const styles = StyleSheet.create({
   planActionTextPrimary: {
     color: '#ffffff',
   },
-  adminPreviewButton: {
-    backgroundColor: '#eef8d7',
-    borderRadius: 18,
-    paddingVertical: 14,
+  emptyState: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 18,
   },
-  adminPreviewText: {
-    color: COLORS.accent,
-    fontWeight: '700',
+  emptyStateText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    textAlign: 'center',
   },
   statsCard: {
     backgroundColor: COLORS.surface,

@@ -5,7 +5,6 @@ import { COLORS } from '../theme';
 const tabs = [
   { key: 'home', label: 'HOME', icon: '🏠' },
   { key: 'orders', label: 'ORDERS', icon: '🧾' },
-  { key: 'tracking', label: 'TRACK', icon: '📍' },
   { key: 'profile', label: 'PROFILE', icon: '👤' },
 ];
 

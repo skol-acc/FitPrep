@@ -15,10 +15,10 @@ const plans = [
   { id: 'p3', title: 'Bulking', subtitle: 'High-calorie surplus designed for maximum muscle growth.', calories: '3,200 - 3,600 kcal', macros: '35/45/20', price: '$179.99/mo', image: 'https://via.placeholder.com/120' },
 ];
 
-export default function AdminMealsScreen({ onOpenCategory, onCreateMeal }) {
+export default function AdminMealsScreen({ onOpenCategory, onCreateMeal, onBack }) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <HeaderBar title="Meal Management" action={{ icon: '🔔', onPress: () => {} }} />
+      <HeaderBar title="Meal Management" action={{ icon: '🔔', onPress: () => {} }} onBack={onBack} />
 
       <Text style={styles.subHeading}>ADMINISTRATION</Text>
       <Text style={styles.title}>Active Meal Plans</Text>

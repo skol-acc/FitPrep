@@ -17,10 +17,10 @@ const settings = [
   { label: 'Payment Methods', icon: '💳' },
 ];
 
-export default function ProfileScreen({ user, onLogout, onNavigateSetting }) {
+export default function ProfileScreen({ user, onLogout, onNavigateSetting, onBack }) {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <HeaderBar title="Profile" action={{ icon: '☰', onPress: () => {} }} />
+      <HeaderBar title="Profile" action={{ icon: '☰', onPress: () => {} }} onBack={onBack} />
 
       <View style={styles.profileCard}>
         <View style={styles.avatarContainer}>

@@ -1,68 +1,82 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
 import HeaderBar from '../components/HeaderBar';
 import { COLORS } from '../theme';
+import { usePlans } from '../context/PlansContext';
 
-const days = ['MON 12', 'TUE 13', 'WED 14', 'THU 15', 'FRI 16'];
-const meals = [
-  { type: 'Breakfast', title: 'Almond Berry Power Bowl', calories: '340 kcal', protein: '12g', carbs: '45g', fat: '14g' },
-  { type: 'Lunch', title: 'Grilled Salmon & Quinoa', calories: '520 kcal', protein: '42g', carbs: '30g', fat: '24g' },
-  { type: 'Snack', title: 'Green Apple & Nut Butter', calories: '180 kcal', protein: '4g', carbs: '22g', fat: '10g' },
-  { type: 'Dinner', title: 'Roasted Chicken & Kale', calories: '450 kcal', protein: '38g', carbs: '28g', fat: '18g' },
-];
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function WeeklyPlanScreen({ onBack, onPreorder }) {
-  const [selectedDay, setSelectedDay] = useState(days[0]);
-  const [selectedSection, setSelectedSection] = useState('Plan');
+  const { plans, meals, mealsLoading, selectedPlan, loadMealsForPlan } = usePlans();
+  const [selectedDay, setSelectedDay] = useState('Monday');
+
+  // Auto-load meals for the first plan on mount
+  useEffect(() => {
+    if (plans && plans.length > 0 && !selectedPlan) {
+      loadMealsForPlan(plans[0]);
+    }
+  }, [plans]);
+
+  const plan = selectedPlan || plans?.[0];
+  const daysWithMeals = [...new Set(meals.map((m) => m.day_of_week))]
+    .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+  const dayMeals = meals.filter((m) => m.day_of_week === selectedDay);
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <HeaderBar title="Weekly Plan" onBack={onBack} action={{ icon: '📅', onPress: () => {} }} />
+      <HeaderBar
+        title={plan ? `${plan.name} — ${plan.category}` : 'Weekly Plan'}
+        onBack={onBack}
+      />
 
-      <View style={styles.sectionNav}>
-        {['Today', 'Plan', 'Stats', 'Account'].map((item) => (
-          <Pressable
-            key={item}
-            style={[styles.sectionNavButton, selectedSection === item && styles.sectionNavButtonActive]}
-            onPress={() => setSelectedSection(item)}
-          >
-            <Text style={[styles.sectionNavLabel, selectedSection === item && styles.sectionNavLabelActive]}>{item}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {mealsLoading && <ActivityIndicator color={COLORS.accent} style={{ marginVertical: 24 }} />}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daysRow}>
-        {days.map((day) => (
-          <Pressable
-            key={day}
-            style={[styles.dayButton, selectedDay === day && styles.dayButtonActive]}
-            onPress={() => setSelectedDay(day)}
-          >
-            <Text style={[styles.dayLabel, selectedDay === day && styles.dayLabelActive]}>{day}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      {!mealsLoading && daysWithMeals.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daysRow}>
+          {daysWithMeals.map((day) => (
+            <Pressable
+              key={day}
+              style={[styles.dayButton, selectedDay === day && styles.dayButtonActive]}
+              onPress={() => setSelectedDay(day)}
+            >
+              <Text style={[styles.dayLabel, selectedDay === day && styles.dayLabelActive]}>
+                {day.slice(0, 3).toUpperCase()}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
 
-      {meals.map((meal, index) => (
-        <View key={meal.title} style={styles.mealCard}>
+      {!mealsLoading && dayMeals.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No meals scheduled for {selectedDay} yet.</Text>
+        </View>
+      )}
+
+      {dayMeals.map((meal) => (
+        <View key={meal.id} style={styles.mealCard}>
           <View style={styles.mealImagePlaceholder} />
           <View style={styles.mealContent}>
-            <Text style={styles.mealType}>{meal.type.toUpperCase()}</Text>
-            <Text style={styles.mealTitle}>{meal.title}</Text>
-            <Text style={styles.mealCalories}>{meal.calories}</Text>
+            <Text style={styles.mealType}>{meal.day_of_week?.toUpperCase()}</Text>
+            <Text style={styles.mealTitle}>{meal.meal_name}</Text>
+            <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
             <View style={styles.nutritionRow}>
-              <Text style={styles.nutritionText}>PROTEIN {meal.protein}</Text>
-              <Text style={styles.nutritionText}>CARBS {meal.carbs}</Text>
-              <Text style={styles.nutritionText}>FAT {meal.fat}</Text>
+              <Text style={styles.nutritionText}>PROTEIN {meal.protein_g}g</Text>
+              <Text style={styles.nutritionText}>CARBS {meal.carbs_g}g</Text>
+              <Text style={styles.nutritionText}>FAT {meal.fats_g}g</Text>
             </View>
-            <View style={styles.nutritionTrack}><View style={[styles.nutritionFill, { width: `${Math.min(100, (parseInt(meal.protein, 10) / 50) * 100)}%`}]} /></View>
+            <View style={styles.nutritionTrack}>
+              <View style={[styles.nutritionFill, { width: `${Math.min(100, ((meal.protein_g || 0) / 50) * 100)}%` }]} />
+            </View>
           </View>
         </View>
       ))}
 
-      <Pressable style={styles.preorderButton} onPress={onPreorder}>
-        <Text style={styles.preorderLabel}>Preorder Plan →</Text>
-      </Pressable>
+      {plan && (
+        <Pressable style={styles.preorderButton} onPress={() => onPreorder(plan)}>
+          <Text style={styles.preorderLabel}>Preorder This Plan →</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -78,10 +92,17 @@ const styles = StyleSheet.create({
   daysRow: {
     marginBottom: 22,
   },
-  sectionNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+  emptyState: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  emptyStateText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    textAlign: 'center',
   },
   sectionNavButton: {
     flex: 1,

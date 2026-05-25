@@ -1,35 +1,53 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, TextInput } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import HeaderBar from '../components/HeaderBar';
 import { COLORS } from '../theme';
+import { fetchAllOrders } from '../services/ordersService';
 
-const filterOptions = ['All', 'Preparing', 'Out for Delivery', 'Delivered'];
+const filterOptions = ['All', 'Paid (Mock)'];
 
-export default function AdminOrdersScreen({ orders: propOrders = [], onViewCustomer, onOpenDetails }) {
+export default function AdminOrdersScreen({ onBack }) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [filter, setFilter] = useState('All');
 
-  const orders = useMemo(() => {
-    return propOrders.filter((order) => {
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await fetchAllOrders();
+      if (!error) setOrders(data || []);
+      setLoading(false);
+    })();
+  }, []);
+
+  const filtered = useMemo(() => {
+    return orders.filter((order) => {
       const lower = searchText.toLowerCase();
-      const matchesSearch = order.id.toLowerCase().includes(lower) || order.customer.toLowerCase().includes(lower);
+      const planName = order.published_weekly_plans?.name?.toLowerCase() || '';
+      const matchesSearch = order.id.toLowerCase().includes(lower) || planName.includes(lower);
       const matchesFilter = filter === 'All' || order.status === filter;
       return matchesSearch && matchesFilter;
     });
-  }, [propOrders, searchText, filter]);
+  }, [orders, searchText, filter]);
+
+  const formatDate = (isoStr) => {
+    if (!isoStr) return '';
+    return new Date(isoStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <HeaderBar title="Order Management" action={{ icon: '👁️', onPress: onViewCustomer }} />
+      <HeaderBar title="Order Management" action={{ icon: '🔄', onPress: () => {} }} onBack={onBack} />
 
-      <Text style={styles.sectionTitle}>Customer Orders</Text>
+      <Text style={styles.sectionTitle}>All Orders</Text>
       <TextInput
         value={searchText}
         onChangeText={setSearchText}
-        placeholder="Search by Order ID or Customer..."
+        placeholder="Search by order ID or plan name..."
         placeholderTextColor="#9aa298"
         style={styles.searchInput}
       />
+
       <View style={styles.filtersRow}>
         {filterOptions.map((option) => (
           <Pressable
@@ -42,21 +60,27 @@ export default function AdminOrdersScreen({ orders: propOrders = [], onViewCusto
         ))}
       </View>
 
-      {orders.map((order) => (
+      {loading && <ActivityIndicator color={COLORS.accent} style={{ marginVertical: 24 }} />}
+
+      {!loading && filtered.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No orders found.</Text>
+        </View>
+      )}
+
+      {filtered.map((order) => (
         <View key={order.id} style={styles.orderCard}>
           <View style={styles.orderHead}>
-            <Text style={styles.orderId}>#{order.id}</Text>
-            <View style={[styles.statusBadge, order.status === 'Delivered' ? styles.statusDelivered : order.status === 'Out for Delivery' ? styles.statusOut : styles.statusPreparing]}>
-              <Text style={styles.statusText}>{order.status.toUpperCase()}</Text>
+            <Text style={styles.orderId}>#{order.id.slice(0, 8).toUpperCase()}</Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>{order.status?.toUpperCase()}</Text>
             </View>
           </View>
-          <Text style={styles.orderCustomer}>{order.customer}</Text>
-          <Text style={styles.orderPlan}>{order.plan}</Text>
+          <Text style={styles.orderPlan}>{order.published_weekly_plans?.name || '—'}</Text>
+          <Text style={styles.orderCategory}>{order.published_weekly_plans?.category}</Text>
           <View style={styles.orderFooter}>
-            <Text style={styles.orderDate}>{order.date}</Text>
-            <Pressable onPress={() => onOpenDetails && onOpenDetails(order)}>
-              <Text style={styles.detailsLink}>Details</Text>
-            </Pressable>
+            <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
+            <Text style={styles.orderPrice}>${order.published_weekly_plans?.weekly_price?.toFixed(2) || '—'}</Text>
           </View>
         </View>
       ))}
@@ -74,17 +98,16 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#eef7dd', borderColor: COLORS.accent },
   filterLabel: { color: COLORS.brand, fontWeight: '700' },
   filterLabelActive: { color: COLORS.accent },
+  emptyState: { backgroundColor: COLORS.surface, borderRadius: 20, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
+  emptyText: { color: COLORS.textSecondary, fontSize: 15 },
   orderCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: COLORS.border },
   orderHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   orderId: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
-  statusBadge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
-  statusPreparing: { backgroundColor: '#edf2d8' },
-  statusOut: { backgroundColor: '#fff2d2' },
-  statusDelivered: { backgroundColor: '#dff4da' },
+  statusBadge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, backgroundColor: '#dff4da' },
   statusText: { color: COLORS.brand, fontSize: 11, fontWeight: '800' },
-  orderCustomer: { color: COLORS.brand, fontSize: 20, fontWeight: '900', marginBottom: 6 },
-  orderPlan: { color: COLORS.textSecondary, marginBottom: 10 },
+  orderPlan: { color: COLORS.brand, fontSize: 18, fontWeight: '900', marginBottom: 4 },
+  orderCategory: { color: COLORS.accent, fontWeight: '700', fontSize: 13, marginBottom: 10 },
   orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   orderDate: { color: COLORS.muted, fontSize: 12 },
-  detailsLink: { color: COLORS.accent, fontWeight: '800' },
+  orderPrice: { color: COLORS.brand, fontWeight: '800', fontSize: 15 },
 });

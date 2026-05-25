@@ -6,7 +6,6 @@ const tabs = [
   { key: 'adminHome', icon: '📊', label: 'Overview' },
   { key: 'adminMeals', icon: '🍽️', label: 'Meals' },
   { key: 'adminOrders', icon: '🧾', label: 'Orders' },
-  { key: 'adminDelivery', icon: '🚚', label: 'Delivery' },
 ];
 
 export default function AdminBottomNav({ active, onChange }) {

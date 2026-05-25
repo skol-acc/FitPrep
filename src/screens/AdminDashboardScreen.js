@@ -1,23 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import HeaderBar from '../components/HeaderBar';
 import { COLORS } from '../theme';
+import { usePlans } from '../context/PlansContext';
+import { fetchAllOrders } from '../services/ordersService';
 
-const stats = [
-  { label: 'Total Orders', value: '1,284', meta: '+12.5% this week' },
-  { label: 'Active Deliveries', value: '42', meta: '8 en route • 34 pending' },
-  { label: 'Total Revenue', value: '$24,510', meta: 'Live' },
-];
+export default function AdminDashboardScreen({ user, onLogout, onBack }) {
+  const { plans } = usePlans();
+  const [orderCount, setOrderCount] = useState('—');
+  const [revenue, setRevenue] = useState('—');
 
-const activity = [
-  { title: 'New Meal Plan Created', detail: 'High-Protein Summer Bulk published by Sarah K.', time: '2 mins ago' },
-  { title: 'New VIP Subscriber', detail: 'James Wilson upgraded to Platinum Plan.', time: '45 mins ago' },
-];
+  useEffect(() => {
+    (async () => {
+      const { data } = await fetchAllOrders();
+      if (data) {
+        setOrderCount(data.length);
+        const total = data.reduce((sum, o) => sum + (o.published_weekly_plans?.weekly_price || 0), 0);
+        setRevenue(`$${total.toFixed(2)}`);
+      }
+    })();
+  }, []);
 
-export default function AdminDashboardScreen({ user, onLogout, onCreateMeal, onViewCustomer }) {
+  const stats = [
+    { label: 'Total Orders', value: String(orderCount), meta: 'All time' },
+    { label: 'Active Plans', value: String(plans?.length || 0), meta: 'This week' },
+    { label: 'Total Revenue', value: revenue, meta: 'Est. from orders' },
+  ];
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <HeaderBar title="Dashboard Overview" action={{ icon: '🔔', onPress: () => {} }} />
+      <HeaderBar title="Dashboard" action={{ icon: '🔔', onPress: () => {} }} onBack={onBack} />
 
       <Text style={styles.subHeading}>OPERATIONAL SNAPSHOT</Text>
       <Text style={styles.title}>Dashboard Overview</Text>
@@ -35,37 +47,13 @@ export default function AdminDashboardScreen({ user, onLogout, onCreateMeal, onV
       <View style={styles.chartCard}>
         <Text style={styles.cardTitle}>Weekly Growth</Text>
         <View style={styles.chartPlaceholder}>
-          <Text style={styles.chartText}>[Revenue chart]</Text>
-        </View>
-        <View style={styles.chartFooter}>
-          <View>
-            <Text style={styles.chartLabel}>Peak Performance</Text>
-            <Text style={styles.chartValue}>Friday (+$4.2k)</Text>
-          </View>
-          <View style={styles.chartMetric}>
-            <Text style={styles.chartLabel}>Efficiency</Text>
-            <Text style={styles.chartValue}>98.2%</Text>
-          </View>
+          <Text style={styles.chartText}>[Revenue chart — coming soon]</Text>
         </View>
       </View>
-
-      <Pressable style={styles.createAction} onPress={onCreateMeal}>
-        <Text style={styles.createActionText}>＋ Create Meal Plan</Text>
-        <Text style={styles.createActionArrow}>›</Text>
-      </Pressable>
 
       <Pressable style={styles.logoutAction} onPress={onLogout}>
         <Text style={styles.logoutActionText}>Logout</Text>
       </Pressable>
-
-      <Text style={styles.sectionTitle}>Recent Activity</Text>
-      {activity.map((item) => (
-        <View key={item.title} style={styles.activityCard}>
-          <Text style={styles.activityTitle}>{item.title}</Text>
-          <Text style={styles.activityDetail}>{item.detail}</Text>
-          <Text style={styles.activityTime}>{item.time}</Text>
-        </View>
-      ))}
     </ScrollView>
   );
 }

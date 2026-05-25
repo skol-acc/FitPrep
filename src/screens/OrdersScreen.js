@@ -1,60 +1,77 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
 import HeaderBar from '../components/HeaderBar';
 import { COLORS } from '../theme';
+import { fetchMyOrders } from '../services/ordersService';
 
-const summary = [
-  { label: 'Total Orders', value: '24' },
-  { label: 'Completed', value: '22', active: true },
-  { label: 'Active', value: '2' },
-];
+export default function OrdersScreen({ onOpenReview, onBack }) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-const orders = [
-  { title: 'Cutting Plan', date: 'Oct 5 - Oct 11', price: '$168.00', status: 'DELIVERED' },
-  { title: 'Bulking Plan', date: 'Sep 28 - Oct 4', price: '$195.50', status: 'COMPLETED' },
-  { title: 'Maintenance Plan', date: 'Sep 21 - Sep 27', price: '$152.00', status: 'COMPLETED' },
-];
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await fetchMyOrders();
+      if (!error) setOrders(data || []);
+      setLoading(false);
+    })();
+  }, []);
 
-export default function OrdersScreen({ onOpenCheckout, onOpenReview }) {
+  const formatDate = (isoStr) => {
+    if (!isoStr) return '';
+    return new Date(isoStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <HeaderBar title="History" action={{ icon: '⚙️', onPress: () => {} }} />
+      <HeaderBar title="My Orders" action={{ icon: '⚙️', onPress: () => {} }} onBack={onBack} />
 
-      <View style={styles.summaryRow}>
-        {summary.map((item) => (
-          <View key={item.label} style={[styles.summaryCard, item.active && styles.summaryActive]}>
-            <Text style={styles.summaryLabel}>{item.label}</Text>
-            <Text style={styles.summaryValue}>{item.value}</Text>
-          </View>
-        ))}
-      </View>
+      {loading && <ActivityIndicator color={COLORS.accent} style={{ marginVertical: 24 }} />}
 
-      <Text style={styles.sectionTitle}>Recent Orders</Text>
-      {orders.map((order) => (
-        <View key={order.title} style={styles.orderCard}>
-          <View style={styles.orderBadge} />
-          <View style={styles.orderBody}>
-            <Text style={styles.orderTitle}>{order.title}</Text>
-            <Text style={styles.orderDate}>{order.date}</Text>
-            <Text style={styles.orderPrice}>{order.price}</Text>
-          </View>
-          <View style={styles.orderActions}>
-            <Pressable style={styles.orderButton} onPress={() => onOpenCheckout(order.title)}>
-              <Text style={styles.orderButtonText}>Details</Text>
-            </Pressable>
-            <Pressable style={styles.reviewButton} onPress={() => onOpenReview(order.title)}>
-              <Text style={styles.reviewButtonText}>Review</Text>
-            </Pressable>
-          </View>
+      {!loading && orders.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateTitle}>No orders yet</Text>
+          <Text style={styles.emptyStateText}>Browse the weekly plans and place your first preorder!</Text>
         </View>
-      ))}
+      )}
+
+      {!loading && orders.length > 0 && (
+        <>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Total Orders</Text>
+              <Text style={styles.summaryValue}>{orders.length}</Text>
+            </View>
+            <View style={[styles.summaryCard, styles.summaryActive]}>
+              <Text style={styles.summaryLabel}>Active</Text>
+              <Text style={styles.summaryValue}>{orders.filter((o) => o.status?.includes('Paid')).length}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Order History</Text>
+          {orders.map((order) => (
+            <View key={order.id} style={styles.orderCard}>
+              <View style={styles.orderBadge} />
+              <View style={styles.orderBody}>
+                <Text style={styles.orderTitle}>{order.published_weekly_plans?.name || 'Plan'}</Text>
+                <Text style={styles.orderDate}>Ordered {formatDate(order.created_at)}</Text>
+                <Text style={styles.orderPrice}>${order.published_weekly_plans?.weekly_price?.toFixed(2) || '—'}</Text>
+              </View>
+              <View style={styles.orderActions}>
+                <View style={styles.statusChip}>
+                  <Text style={styles.statusText}>{order.status?.toUpperCase()}</Text>
+                </View>
+                <Pressable style={styles.reviewButton} onPress={() => onOpenReview(order)}>
+                  <Text style={styles.reviewButtonText}>Review</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </>
+      )}
 
       <View style={styles.ctaCard}>
         <Text style={styles.ctaHeading}>Ready for next week?</Text>
-        <Text style={styles.ctaDescription}>Stay on track with your Bulking Plan. Fast delivery guaranteed.</Text>
-        <Pressable style={styles.ctaButton} onPress={() => onOpenCheckout('Bulking')}>
-          <Text style={styles.ctaButtonText}>Reorder Favorite</Text>
-        </Pressable>
+        <Text style={styles.ctaDescription}>New plans are published every Saturday. Check back to preorder!</Text>
       </View>
     </ScrollView>
   );
@@ -191,15 +208,24 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     lineHeight: 20,
   },
-  ctaButton: {
-    backgroundColor: '#d7f16a',
-    borderRadius: 16,
-    paddingVertical: 14,
+  emptyState: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 22,
+    padding: 28,
     alignItems: 'center',
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  ctaButtonText: {
-    color: COLORS.brand,
+  emptyStateTitle: {
+    fontSize: 18,
     fontWeight: '800',
-    fontSize: 15,
+    color: COLORS.brand,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

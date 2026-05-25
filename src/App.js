@@ -5,17 +5,11 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import HomeScreen from './screens/HomeScreen';
 import OrdersScreen from './screens/OrdersScreen';
-import OrderTrackingScreen from './screens/OrderTrackingScreen';
 import ProfileScreen from './screens/ProfileScreen';
-import EditProfileScreen from './screens/EditProfileScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
 import AdminOrdersScreen from './screens/AdminOrdersScreen';
-import AdminTrackingScreen from './screens/AdminTrackingScreen';
 import AdminMealsScreen from './screens/AdminMealsScreen';
-import AdminMealCategoryScreen from './screens/AdminMealCategoryScreen';
 import AdminMealForm from './screens/AdminMealForm';
-import AdminOrderDetailsScreen from './screens/AdminOrderDetailsScreen';
-import AdminDeliveryScreen from './screens/AdminDeliveryScreen';
 import CheckoutScreen from './screens/CheckoutScreen';
 import ReviewScreen from './screens/ReviewScreen';
 import WeeklyPlanScreen from './screens/WeeklyPlanScreen';
@@ -23,31 +17,35 @@ import BottomNav from './components/BottomNav';
 import AdminBottomNav from './components/AdminBottomNav';
 import { COLORS } from './theme';
 import { supabase } from './lib/supabaseClient';
+import { PlansProvider } from './context/PlansContext';
 
 export default function App() {
-  const [route, setRoute] = useState('login');
+  const [history, setHistory] = useState(['login']);
   const [sessionLoaded, setSessionLoaded] = useState(false);
-  const [profileEditSection, setProfileEditSection] = useState('Personal Information');
   const [user, setUser] = useState({
     name: 'Loading...',
     email: '',
     goal: 'bulking',
-    address: '482 Fitness Way, Apt 4B, Austin TX',
-    paymentMethod: 'Visa •••• 1234',
     role: 'customer',
   });
-  const [selectedPlan, setSelectedPlan] = useState('Cutting Plan');
-  const [trackingReturnRoute, setTrackingReturnRoute] = useState('orders');
-  const [adminData, setAdminData] = useState({
-    meals: { cutting: [], bulking: [], maintenance: [] },
-    orders: [
-      { id: 'ORD-8921', plan: 'Bulking Plan (Level 3)', customer: 'Sarah Jenkins', status: 'Preparing', date: 'Oct 24, 2023', payment: 'Online', proof: null },
-      { id: 'ORD-8922', plan: 'Lean Green Plan', customer: 'Marcus Thorne', status: 'Delivered', date: 'Oct 24, 2023', payment: 'Cash', proof: null },
-      { id: 'ORD-8923', plan: 'Performance Pro', customer: 'Elena Rossi', status: 'Out for Delivery', date: 'Oct 23, 2023', payment: 'Online', proof: 'https://via.placeholder.com/300' },
-    ],
-  });
-  const [adminActiveCategory, setAdminActiveCategory] = useState(null);
-  const [adminSelectedOrder, setAdminSelectedOrder] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+
+  const route = history[history.length - 1];
+
+  const navigateTo = (screen) => {
+    setHistory((prev) => [...prev, screen]);
+  };
+
+  const navigateBack = () => {
+    setHistory((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.slice(0, -1);
+    });
+  };
+
+  const resetTo = (screen) => {
+    setHistory([screen]);
+  };
 
   React.useEffect(() => {
     if (!supabase) {
@@ -81,7 +79,7 @@ export default function App() {
 
   const handleSession = (session) => {
     if (!session) {
-      setRoute('login');
+      setHistory(['login']);
       return;
     }
     const role = session.user.app_metadata?.role || 'customer';
@@ -94,11 +92,12 @@ export default function App() {
     }));
     
     // Ensure we route to the appropriate home if currently on login or register
-    setRoute((current) => {
+    setHistory((prev) => {
+      const current = prev[prev.length - 1];
       if (current === 'login' || current === 'register') {
-        return role === 'admin' ? 'adminHome' : 'home';
+        return [role === 'admin' ? 'adminHome' : 'home'];
       }
-      return current; // Preserve route if already logged in and navigating
+      return prev; // Preserve route if already logged in and navigating
     });
   };
 
@@ -106,50 +105,12 @@ export default function App() {
     if (supabase) {
       await supabase.auth.signOut();
     } else {
-      setRoute('login');
+      setHistory(['login']);
     }
   };
-  const handleOpenCheckout = (planName) => {
-    setSelectedPlan(planName);
-    setRoute('checkout');
-  };
-
-  const handleOpenTracking = (returnRoute) => {
-    setTrackingReturnRoute(returnRoute);
-    setRoute(returnRoute && returnRoute.startsWith('admin') ? 'adminTracking' : 'tracking');
-  };
-
-  const handleOpenAdminCategory = (key) => {
-    setAdminActiveCategory(key);
-    setRoute('adminMealCategory');
-  };
-
-  const handleCreateMeal = () => {
-    setRoute('adminMealForm');
-  };
-
-  const handleSaveMeal = (meal) => {
-    const id = `MEAL-${Date.now()}`;
-    const category = meal.category || adminActiveCategory || 'cutting';
-    setAdminData((prev) => ({
-      ...prev,
-      meals: { ...prev.meals, [category]: [...(prev.meals[category] || []), { id, ...meal }] },
-    }));
-  };
-
-  const handleOpenOrderDetails = (order) => {
-    setAdminSelectedOrder(order);
-    setRoute('adminOrderDetails');
-  };
-
-  const handleUpdateOrder = (updated) => {
-    setAdminData((prev) => ({ ...prev, orders: prev.orders.map((o) => (o.id === updated.id ? updated : o)) }));
-    setRoute('adminOrders');
-  };
-
-  const handleSaveProfile = (updatedUser) => {
-    setUser(updatedUser);
-    setRoute('profile');
+  const handleOpenCheckout = (plan) => {
+    setSelectedPlan(plan);
+    navigateTo('checkout');
   };
 
   const renderScreen = () => {
@@ -162,57 +123,49 @@ export default function App() {
     }
     switch (route) {
       case 'login':
-        return <LoginScreen onNavigateRegister={() => setRoute('register')} />;
+        return <LoginScreen onNavigateRegister={() => navigateTo('register')} />;
       case 'register':
-        return <RegisterScreen onBack={() => setRoute('login')} />;
+        return <RegisterScreen onBack={navigateBack} />;
       case 'home':
-        return <HomeScreen user={user} onOpenWeeklyPlan={() => setRoute('weeklyPlan')} onOpenCheckout={handleOpenCheckout} onSwitchToAdmin={() => setRoute('adminHome')} />;
+        return <HomeScreen user={user} onOpenWeeklyPlan={() => navigateTo('weeklyPlan')} onOpenCheckout={handleOpenCheckout} onBack={history.length > 1 ? navigateBack : null} />;
       case 'orders':
-        return <OrdersScreen onOpenCheckout={handleOpenCheckout} onOpenReview={() => setRoute('review')} />;
-      case 'tracking':
-        return <OrderTrackingScreen onBack={() => setRoute(trackingReturnRoute)} />;
+        return <OrdersScreen user={user} onOpenCheckout={handleOpenCheckout} onOpenReview={() => navigateTo('review')} onBack={history.length > 1 ? navigateBack : null} />;
       case 'profile':
-        return <ProfileScreen user={user} onLogout={handleLogout} onNavigateSetting={(section) => { setProfileEditSection(section); setRoute('profileEdit'); }} />;
-      case 'profileEdit':
-        return <EditProfileScreen section={profileEditSection} user={user} onSave={handleSaveProfile} onBack={() => setRoute('profile')} />;
+        return <ProfileScreen user={user} onLogout={handleLogout} onBack={history.length > 1 ? navigateBack : null} />;
       case 'checkout':
-        return <CheckoutScreen planName={selectedPlan} onBack={() => setRoute('orders')} onConfirm={() => setRoute('orders')} />;
+        return <CheckoutScreen plan={selectedPlan} user={user} onBack={navigateBack} onConfirm={() => resetTo('orders')} />;
       case 'review':
-        return <ReviewScreen onBack={() => setRoute('orders')} onSubmit={() => setRoute('orders')} />;
+        return <ReviewScreen onBack={navigateBack} onSubmit={navigateBack} />;
       case 'weeklyPlan':
-        return <WeeklyPlanScreen onBack={() => setRoute('home')} onPreorder={() => handleOpenCheckout('Bulking Plan')} />;
+        return <WeeklyPlanScreen onBack={navigateBack} onPreorder={handleOpenCheckout} />;
       case 'adminHome':
-        return <AdminDashboardScreen user={user} onLogout={handleLogout} onCreateMeal={handleCreateMeal} onViewCustomer={() => setRoute('home')} />;
+        return <AdminDashboardScreen user={user} onLogout={handleLogout} onBack={history.length > 1 ? navigateBack : null} />;
       case 'adminOrders':
-        return <AdminOrdersScreen orders={adminData.orders} onOpenTracking={() => handleOpenTracking('adminOrders')} onViewCustomer={() => setRoute('home')} onOpenDetails={handleOpenOrderDetails} />;
-      case 'adminTracking':
-        return <AdminTrackingScreen onBack={() => setRoute(trackingReturnRoute)} />;
+        return <AdminOrdersScreen onBack={history.length > 1 ? navigateBack : null} />;
       case 'adminMeals':
-        return <AdminMealsScreen onOpenCategory={handleOpenAdminCategory} onCreateMeal={handleCreateMeal} />;
-      case 'adminMealCategory':
-        return <AdminMealCategoryScreen category={adminActiveCategory} meals={adminData.meals[adminActiveCategory]} onBack={() => setRoute('adminMeals')} onAdd={() => setRoute('adminMealForm')} />;
+        return <AdminMealsScreen onCreateMeal={() => navigateTo('adminMealForm')} onBack={history.length > 1 ? navigateBack : null} />;
       case 'adminMealForm':
-        return <AdminMealForm category={adminActiveCategory} onSave={handleSaveMeal} onBack={() => setRoute('adminMeals')} />;
-      case 'adminOrderDetails':
-        return <AdminOrderDetailsScreen order={adminSelectedOrder} onBack={() => setRoute('adminOrders')} onUpdate={handleUpdateOrder} />;
-      case 'adminDelivery':
-        return <AdminDeliveryScreen />;
+        return <AdminMealForm onBack={navigateBack} />;
       default:
-        return <HomeScreen user={user} onOpenWeeklyPlan={() => setRoute('weeklyPlan')} onOpenCheckout={handleOpenCheckout} onSwitchToAdmin={() => setRoute('adminHome')} />;
+        return <HomeScreen user={user} onOpenWeeklyPlan={() => navigateTo('weeklyPlan')} onOpenCheckout={handleOpenCheckout} />;
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
-      <View style={styles.container}>{renderScreen()}</View>
-      {['home', 'orders', 'profile'].includes(route) && (
-        <BottomNav active={route} onChange={setRoute} />
-      )}
-      {['adminHome', 'adminOrders', 'adminTracking', 'adminMeals', 'adminDelivery'].includes(route) && (
-        <AdminBottomNav active={route} onChange={setRoute} />
-      )}
-    </SafeAreaView>
+    <PlansProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="dark" />
+        <View style={styles.container}>
+          <View style={styles.screenContent}>{renderScreen()}</View>
+          {['home', 'orders', 'profile', 'weeklyPlan'].includes(route) && (
+            <BottomNav active={route === 'weeklyPlan' ? 'home' : route} onChange={resetTo} />
+          )}
+          {['adminHome', 'adminOrders', 'adminMeals'].includes(route) && (
+            <AdminBottomNav active={route} onChange={resetTo} />
+          )}
+        </View>
+      </SafeAreaView>
+    </PlansProvider>
   );
 }
 
@@ -222,6 +175,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   container: {
+    flex: 1,
+  },
+  screenContent: {
     flex: 1,
   },
 });
